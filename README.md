@@ -1,1 +1,1 @@
-# Vrbaliz.AI
+# Verbaliz.AI
