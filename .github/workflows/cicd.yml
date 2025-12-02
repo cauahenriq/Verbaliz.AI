@@ -11,7 +11,7 @@ jobs:
       - name: Checkout do repositório
         uses: actions/checkout@v3
 
-      - name: Listar arquivos de workflow
+      - name: Listar arquivos de workflow do N8N
         run: |
           echo "Listando JSONs do N8N"
           ls n8n
@@ -20,5 +20,5 @@ jobs:
         run: |
           for file in n8n/*.json; do
             echo "Validando $file"
-            jq . "$file" > /dev/null
+            cat "$file" | jq . > /dev/null
           done
