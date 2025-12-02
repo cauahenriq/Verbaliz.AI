@@ -14,11 +14,11 @@ jobs:
       - name: Listar arquivos de workflow
         run: |
           echo "Listando JSONs do N8N"
-          ls workflows
+          ls n8n
 
       - name: Validar sintaxe JSON
         run: |
-          for file in workflows/*.json; do
+          for file in n8n/*.json; do
             echo "Validando $file"
-            cat "$file" | jq . > /dev/null
+            jq . "$file" > /dev/null
           done
