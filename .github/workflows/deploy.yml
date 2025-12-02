@@ -1,0 +1,23 @@
+name: Deploy n8n workflows
+
+on:
+  push:
+    paths:
+      - "workflows/*.json"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Upload workflows to server via SSH
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.N8N_HOST }}
+          username: ${{ secrets.N8N_USER }}
+          key: ${{ secrets.N8N_SSH_KEY }}
+          source: "workflows/*.json"
+          target: "/home/SEU_USUARIO/workflows-n8n/"

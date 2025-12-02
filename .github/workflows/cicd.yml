@@ -1,0 +1,24 @@
+name: CI - Validar Workflows N8N
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v3
+
+      - name: Listar arquivos de workflow
+        run: |
+          echo "Listando JSONs do N8N"
+          ls workflows
+
+      - name: Validar sintaxe JSON
+        run: |
+          for file in workflows/*.json; do
+            echo "Validando $file"
+            cat "$file" | jq . > /dev/null
+          done
