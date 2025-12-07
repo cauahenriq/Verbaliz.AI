@@ -1,42 +1,62 @@
-name: Backup N8N
+name: Deploy to VPS
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "0 0 * * *" # Executa todo dia à meia-noite UTC
+  push:
+    branches:
+      - main        # deploy automático ao fazer push na main
 
 jobs:
-  backup:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1) Executa o backup dentro do container
-      - name: Exportar workflows do N8N (SSH)
-        uses: appleboy/ssh-action@v1.0.2
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          script: |
-            docker exec $(docker ps --format "{{.Names}}" | grep n8n | head -n 1) \
-              n8n export:workflow --all --output=/home/node/.n8n/export-all.json
+      # ==================== CHECKOUT ====================
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      # 2) Faz download do backup para o repositório
-      - name: Fazer download via SCP
+      # ==================== NODE BUILD ====================
+      # Se seu projeto não precisa de build, apague essa parte depois.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      # ⚠ Se seu projeto NÃO possui build, troque para:
+      # run: echo "No build step"
+
+      - name: Build project
+        run: npm run build
+
+      # Opcional: verificar se build existe (evita deploy vazio)
+      - name: List output files
+        run: ls -R .
+
+      # ==================== SCP DEPLOY ====================
+      - name: Upload to VPS
         uses: appleboy/scp-action@v0.1.5
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "/home/node/.n8n/export-all.json"
-          target: "./backup/"
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          # ------------------ O QUE ENVIAR ------------------
+          # Se seu projeto gera pasta "dist", mantenha isso:
+          source: "dist/*"
+          # Se não tiver build, troque para: source: "./*"
+          # ---------------------------------------------------
+          target: "/var/www/seu-app" # altere para seu destino na VPS
           overwrite: true
 
-      # 3) Commit automático
-      - name: Commit e Push
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git add ./backup/export-all.json
-          git commit -m "Backup automático - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Sem mudanças"
-          git push
+      # ==================== PERMISSÕES NA VPS ====================
+      # Isso evita erro de permissão depois do deploy.
+      - name: Fix permissions on VPS
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            sudo chown -R $USER:$USER /var/www/seu-app
+            sudo chmod -R 755 /var/www/seu-app
