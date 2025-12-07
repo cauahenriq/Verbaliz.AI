@@ -1,41 +1,37 @@
-name: Backup n8n Workflows
+name: Backup N8N Workflows
 
 on:
   schedule:
-    - cron: "0 3 * * *" # todo dia às 03h
-  workflow_dispatch: # permite rodar manualmente
+    - cron: "0 */12 * * *"
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Connect and Backup JSON
+        uses: appleboy/ssh-action@v1.0.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cat /home/node/.n8n/workflows/export-all.json > /root/export-all.json
 
-    - name: Connect to VPS and Export Workflows
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-       script: |
-  CONTAINER=$(docker ps --filter "name=n8n_n8n_editor" --format "{{.ID}}")
-  docker exec $CONTAINER n8n export:workflow --all --output=/home/node/.n8n/workflows/export-all.json
+      - name: Download backup via SCP
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "/root/export-all.json"
+          target: "./"
 
-    - name: Download export file via SSH
-      uses: appleboy/scp-action@v0.1.7
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: ${{ secrets.N8N_WORKFLOW_PATH }}
-        target: ./workflows/export-all.json
-
-    - name: Commit and Push if Changed
-      run: |
-        git config user.name "n8n-backup-bot"
-        git config user.email "n8n-bot@example.com"
-        git add ./workflows/export-all.json
-        git commit -m "Backup $(date)" || echo "No changes to commit"
-        git push
+      - name: Commit & Push Backup
+        run: |
+          git config --local user.email "bot@n8n-backup.com"
+          git config --local user.name "n8n-backup-bot"
+          git add export-all.json
+          git commit -m "backup $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git push
