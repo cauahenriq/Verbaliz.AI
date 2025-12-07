@@ -3,40 +3,40 @@ name: Backup N8N
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"  # Todos os dias à meia-noite (UTC)
+    - cron: "0 0 * * *"  # Todo dia à meia-noite (UTC)
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
-      ### 1) Exporta os Workflows via SSH
+      # 1) Exporta os Workflows via SSH usando docker exec
       - name: Export Workflows from VPS (docker exec)
-      uses: appleboy/ssh-action@v1.0.2
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        script: |
-          docker exec $(docker ps --format "{{.Names}}" | grep n8n | head -n 1) \
-            sh -c 'n8n export:workflow --all --output=/home/node/.n8n/export-all.json'
+        uses: appleboy/ssh-action@v1.0.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            docker exec $(docker ps --format "{{.Names}}" | grep n8n | head -n 1) \
+              sh -c 'n8n export:workflow --all --output=/home/node/.n8n/export-all.json'
 
-      ### 2) Faz download do arquivo .json via SCP
+      # 2) Baixa o arquivo via SCP
       - name: Download Backup from VPS
-      uses: appleboy/scp-action@v0.1.5
-      with:
-        host: ${{ secrets.SSH_HOST }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.SSH_PRIVATE_KEY }}
-        source: "/home/node/.n8n/export-all.json"
-        target: "./backup/"
-        overwrite: true
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "/home/node/.n8n/export-all.json"
+          target: "./backup/"
+          overwrite: true
 
-      ### 3) Salva no GitHub
+      # 3) Commit e Push para o GitHub
       - name: Commit and Push Backup
-      run: |
-        git config user.name "GitHub Actions"
-        git config user.email "actions@github.com"
-        git add ./backup/export-all.json
-        git commit -m "Backup N8N - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Nenhuma alteração"
-        git push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add ./backup/export-all.json
+          git commit -m "Backup N8N - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Nenhuma alteração"
+          git push
