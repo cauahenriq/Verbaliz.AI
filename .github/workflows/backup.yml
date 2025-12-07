@@ -1,37 +1,40 @@
-name: Backup N8N Workflows
+name: Backup N8N
 
 on:
-  schedule:
-    - cron: "0 */12 * * *"
   workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *" # todo dia à meia noite UTC
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Connect and Backup JSON
+      - name: Execute backup via SSH
         uses: appleboy/ssh-action@v1.0.2
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
           script: |
-            cat /home/node/.n8n/workflows/export-all.json > /root/export-all.json
+            docker exec n8n_n8n_editor.1.wey49y5kl3ozd0fez63zmcorq sh -c '
+              n8n export:workflow --all --output=/home/node/.n8n/export-all.json
+            '
+            sleep 2
 
-      - name: Download backup via SCP
-        uses: appleboy/scp-action@v0.1.4
+      - name: SCP Download backup from server
+        uses: appleboy/scp-action@v0.1.5
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          source: "/root/export-all.json"
-          target: "./"
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_PRIVATE_KEY }}
+          source: "/home/node/.n8n/export-all.json"
+          target: "./backup/"
 
-      - name: Commit & Push Backup
+      - name: Commit and Push
         run: |
-          git config --local user.email "bot@n8n-backup.com"
-          git config --local user.name "n8n-backup-bot"
-          git add export-all.json
-          git commit -m "backup $(date +'%Y-%m-%d %H:%M:%S')" || echo "No changes to commit"
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add ./backup/export-all.json
+          git commit -m "Backup automático - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Nenhuma alteração"
           git push
