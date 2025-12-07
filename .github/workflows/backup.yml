@@ -3,36 +3,40 @@ name: Backup N8N
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *" # todo dia à meia noite UTC
+    - cron: "0 0 * * *" # Executa todo dia à meia-noite UTC
 
 jobs:
   backup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Execute backup via SSH (gera backup no servidor)
+      # 1) Executa o backup dentro do container
+      - name: Exportar workflows do N8N (SSH)
         uses: appleboy/ssh-action@v1.0.2
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            CONTAINER=$(docker ps --format "{{.Names}}" | grep n8n | head -n 1)
-            docker exec "$CONTAINER" sh -c "n8n export:workflow --all --output=/home/node/.n8n/export-all.json"
+            docker exec $(docker ps --format "{{.Names}}" | grep n8n | head -n 1) \
+              n8n export:workflow --all --output=/home/node/.n8n/export-all.json
 
-      - name: SCP Download backup from server
+      # 2) Faz download do backup para o repositório
+      - name: Fazer download via SCP
         uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "/home/node/.n8n/export-all.json"
-          target: "./backup/export-all.json"
+          target: "./backup/"
+          overwrite: true
 
-      - name: Commit and Push backup
+      # 3) Commit automático
+      - name: Commit e Push
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add ./backup/export-all.json
-          git commit -m "Backup automático - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Nenhuma alteração"
+          git commit -m "Backup automático - $(date '+%Y-%m-%d %H:%M:%S')" || echo "Sem mudanças"
           git push
