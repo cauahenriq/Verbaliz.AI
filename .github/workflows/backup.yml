@@ -31,6 +31,8 @@ jobs:
           source: "/home/node/.n8n/export-all.json"
           target: "./backup/"
           overwrite: true
+          tar_tmp_path: ""   # impede criar tar
+          tar_exec: ""       # impede usar tar
 
       # 3) Commit e Push para o GitHub
       - name: Commit and Push Backup
