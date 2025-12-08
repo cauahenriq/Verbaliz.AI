@@ -1,27 +1,36 @@
-name: Backup N8N
+name: backup-n8n
 
 on:
   schedule:
-    - cron: "0 3 * * *"   # Backup diário às 03:00
-  workflow_dispatch:      # Permite rodar manualmente
+    - cron: "0 3 * * *" # Todo dia às 03:00
+  workflow_dispatch: # Permite rodar manualmente
 
 jobs:
-  backup-n8n:
+  backup:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout (obrigatório para scp)
-        uses: actions/checkout@v4
+    - name: Checkout repo (necessário para pipeline)
+      uses: actions/checkout@v4
 
-      - name: Enviar backup para VPS
-        uses: appleboy/scp-action@v0.1.5
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "/home/n8n/.n8n"       # << O que será enviado
-          target: "/backups/n8n"         # << Onde salvar na VPS
-          overwrite: true
-          rm: false                      # Nunca apagar nada do servidor
-          tar_tmp_path: "/tmp"
+    - name: Exportar backup dentro do container do n8n
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.N8N_HOST }}
+        username: ${{ secrets.N8N_USER }}
+        key: ${{ secrets.N8N_SSH_KEY }}
+        script: |
+          CONTAINER=$(docker ps --format "{{.Names}}" | grep n8n | head -n 1)
+          docker exec $CONTAINER n8n export:full --yes
+          mv /home/node/.n8n/export-all.json /home/node/.n8n/export-$(date +%Y-%m-%d-%H%M).json
 
+    - name: Copiar backup para outra pasta (VPS)
+      uses: appleboy/scp-action@v0.1.5
+      with:
+        host: ${{ secrets.N8N_HOST }}
+        username: ${{ secrets.N8N_USER }}
+        key: ${{ secrets.N8N_SSH_KEY }}
+        source: "/home/node/.n8n/export-*.json"
+        target: "/root/backups-n8n"
+        rm: false
+        overwrite: false
